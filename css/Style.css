@@ -1,0 +1,90 @@
+html{
+    width: 100vw;
+}
+body {
+    background: #e88706;
+    margin: 0vw;
+    border: 0vw;
+    font-family: 'Open Sans', sans-serif;
+    color: white;
+    line-height: 1;
+}
+
+#banner{
+    width: 100vw;
+    opacity: 8;
+    padding-bottom: 2vw;
+}
+
+
+.
+.current:visited {
+    color:#e66363;
+}
+
+
+
+
+
+button {
+    float: left;
+}
+.start{
+	margin-top: 1vw;
+    border: .24vw solid gray;
+    padding: .10vw;
+    border-radius: 2.96vw;
+	width: 30vw;
+	font-size: 2vw;
+	font-family: Verdana, Geneva;
+
+	
+	
+}
+.start:hover {
+	background:#e88706;
+}
+.How {
+    border: .24vw solid gray;
+    padding: .10vw;
+    border-radius: 2.96vw;
+	width: 30vw;
+	font-size: 2vw;
+	font-family: Verdana, Geneva;
+	
+
+}
+.How:hover{
+	background:#e88706;
+}
+
+.centerborder{
+	font-size: 3.55vw;
+    border-radius: 2.96vw;
+    background: #deefd5;
+    padding: 2.37vw;
+    width: 40.24vw;
+    height: 27.32vw;
+	text-decoration: none;
+}
+
+/* unvisited link */
+a:link {
+    color: black;
+	text-decoration: none;
+}
+
+/* visited link */
+a:visited {
+    color: black;
+}
+
+/* mouse over link */
+a:hover {
+    color: white;
+}
+
+/* selected link */
+a:active {
+    color: blue;
+}
