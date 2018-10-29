@@ -1,9 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
   <title>Danger Zone</title>
   <style>
     #map{
@@ -11,22 +9,92 @@
       width:100%;
     }
   </style>
+  <script src="js/app.js"></script>
 </head>
 <body>
   <h1>Danger Zone</h1>
   <div id="map"></div>
   <script>
+
+        idb.init({
+            database: "dzonemanager",
+            version: 1,
+            tables: [
+                {
+                    name: "locations",
+                    keyPath: "ID",
+                    autoIncrement: true,
+                    index: [{ name: "alertlevel", unique: false}]
+                },
+            ]
+        });
+
+    function saveData(lat,lng) {
+        var alertlvl = document.getElementById('alertlevel');
+          idb.insert("locations", [{lat: lat, lng: lng}], function (isInserted, responseText) {
+              console.log(isInserted);
+              console.log(responseText);
+          });
+      }
+        window.onload = saveData;
+
+    </script>
+    <script>
+    
     function initMap(){
+        latitude = new Array();
+        longitude = new Array();
         var infowindow;
         var map;
         var red_icon =  'http://maps.google.com/mapfiles/ms/icons/red-dot.png' ;
         var purple_icon =  'http://maps.google.com/mapfiles/ms/icons/purple-dot.png' ;
       // New map
       map = new google.maps.Map(document.getElementById('map'), {
-        zoom:6,
+        zoom:16,
         center: new google.maps.LatLng(16.413839, 120.590797),
         mapTypeId: 'roadmap'
       });
+
+          var result = idb.select("locations", [1, 2], function (isSelected, responseData) {
+            
+                if (isSelected) {
+                    for(i = 0; i < responseData.length; i++){
+                      latitude[i] = parseFloat (responseData[i].lat);
+                      longitude[i] = parseFloat (responseData[i].lng);
+                    } 
+
+                  var markers = [];
+                  for(i = 0; i < latitude.length; i++) {
+                    markers[i] = {coords:{lat:latitude[i],lng:longitude[i]}};
+                  }
+                  
+                  for(var i = 0;i < markers.length;i++){
+                    // Add marker
+                    addMarker(markers[i]);
+                  }
+
+                  function addMarker(props){
+                    var marker = new google.maps.Marker({
+                      position:props.coords,
+                      map:map,
+                      //icon:props.iconImage
+                    });
+
+                    if(props.content){
+                      var infoWindow = new google.maps.InfoWindow({
+                        content:props.content
+                      });
+
+                      marker.addListener('click', function(){
+                        infoWindow.open(map, marker);
+                      });
+                    }
+                  }
+                  } else {
+                        console.log("Error: " + responseText);
+                      }
+          });
+
       infoWindow = new google.maps.InfoWindow;
 
         if (navigator.geolocation) {
@@ -58,29 +126,29 @@
         return new google.maps.LatLng(lat, lng);
       }
 
-      var addMarker = google.maps.event.addListener(map, 'click', function(e) {
-            var lat = e.latLng.lat(); 
-            var lng = e.latLng.lng(); 
-            var markerId = getMarkerUniqueId(lat, lng);
-            var marker = new google.maps.Marker({
-                position: getLatLng(lat, lng),
-                map: map,
-                animation: google.maps.Animation.DROP,
-                id: 'marker_' + markerId,
-                html: "    <div id='info_"+markerId+"'>\n" +
-                "        <table class=\"map1\">\n" +
-                "            <tr>\n" +
-                "                <td><a>Alert Level: </a></td>\n" +
-                "                <td><select><option id='alertlevel' style='background:red'>Danger</option><option id='alertlevel' style='background:yellow'>Caution</option><option id='alertlevel' style='background:green'>Safe</option></select></td></tr>\n" +
-                "            <tr><td></td><td><input type='button' value='Save' onclick='saveData("+lat+","+lng+")'/></td></tr>\n" +
-                "        </table>\n" +
-                "    </div>"
-            });
-            markers[markerId] = marker; 
-            bindMarkerEvents(marker); 
-            bindMarkerinfo(marker); 
-        });
-
+        var addMarker = google.maps.event.addListener(map, 'click', function(e) {
+              var lat = e.latLng.lat(); 
+              var lng = e.latLng.lng(); 
+              var markerId = getMarkerUniqueId(lat, lng);
+              var marker = new google.maps.Marker({
+                  position: getLatLng(lat, lng),
+                  map: map,
+                  animation: google.maps.Animation.DROP,
+                  id: 'marker_' + markerId,
+                  html: "    <div id='info_"+markerId+"'>\n" +
+                  "        <table class=\"map1\">\n" +
+                  "            <tr>\n" +
+                  "                <td><a>Alert Level: </a></td>\n" +
+                  "                <td><select id='alertlevel'><option value='1' style='background:red'>Danger</option><option value='2' style='background:yellow'>Caution</option><option value='3' style='background:green'>Safe</option></select></td></tr>\n" +
+                  "            <tr><td></td><td><input type='button' value='Save' onclick='saveData("+lat+","+lng+")'/></td></tr>\n" +
+                  "        </table>\n" +
+                  "    </div>"
+              });
+              markers[markerId] = marker; 
+              bindMarkerEvents(marker); 
+              bindMarkerinfo(marker); 
+          });
+		
       var bindMarkerinfo = function(marker) {
             google.maps.event.addListener(marker, "click", function (point) {
                 var markerId = getMarkerUniqueId(point.latLng.lat(), point.latLng.lng()); 
@@ -103,11 +171,27 @@
             delete markers[markerId]; 
         }
       }
+	  
+	  function getData() {
+		  
+		  var transaction = db.transaction(["locations"], "readwrite");
+		  transaction.oncomplete = function(event) {
+			note.innerHTML += '<li>Transaction completed.</li>';
+		  };
 
-      function saveData(lat, lng) {
-        var alertlvl = document.getElementById('alertlevel').value;
-      }
-            
+		  transaction.onerror = function(event) {
+			note.innerHTML += '<li>Transaction not opened due to error: ' + transaction.error + '</li>';
+		  };
+
+		  var objectStore = transaction.objectStore("locations");
+		  var objectStoreRequest = objectStore.get(lng);
+		  objectStoreRequest.onsuccess = function(event) {
+			note.innerHTML += '<li>Request successful.</li>';
+			var myRecord = objectStoreRequest.result;
+		  };
+
+	 };
+
       function handleLocationError(browserHasGeolocation, infoWindow, pos) {
         infoWindow.setPosition(pos);
         infoWindow.setContent(browserHasGeolocation ?
@@ -115,10 +199,8 @@
                               'Error: Your browser doesn\'t support geolocation.');
         infoWindow.open(map);
       }
-
   </script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyANH7TzF8DmyZEF7RYUR5BNpnULhfQ6y0k&callback=initMap">
     </script>
-  <script src="js/app.js"></script>
 </body>
 </html>

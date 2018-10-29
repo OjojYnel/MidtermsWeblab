@@ -1,61 +1,174 @@
-var request = self.indexedDB.open('dzonemanager', 1);
+idb = {
+	request: null,
+	db: null,
+	version: 1,
+	tables: null,
+	init: function (options) {
+        idb.tables = options.tables;
+		request = self.indexedDB.open(options.database, options.version);
 
-request.onupgradeneeded = function(event) {
-    var db = event.target.result;
-    var locationsStore = db.createObjectStore('locations', {keyPath: 'id', autoIncrement: true});
-    locationsStore.createIndex('lat', 'lat', {unique: false});
-    locationsStore.createIndex('lng', 'lng', {unique: false});
-    locationsStore.createIndex('alertlvl', 'alertlvl', {unique: false});
-};
+		request.onerror = function(event) {
+            console.log("Error opening database.");
+		};
 
-request.onsuccess = function(event) {
-    var locations = [
-    	{lat: lat, lng: lng, alertlvl: alertlvl}
-    ];
+		request.onsuccess = function(event) {
+			idb.db = this.result;
+		    idb.version = options.version;
+		};
 
-    
-    var db = event.target.result;
+		request.onupgradeneeded = function (event) { // creation of object store first time on version change.
+                var resultDb = event.target.result;
+                idb.db = resultDb;
+                var optionTables = idb.tables;
 
-    // create transaction from database
-    var transaction = db.transaction('locations', 'readwrite');
 
-    // add success event handleer for transaction
-    // you should also add onerror, onabort event handlers
-    transaction.onsuccess = function(event) {
-        console.log('[Transaction] ALL DONE!');
-    };
+                //drop unwanted tables
+                for (var i = 0; i < resultDb.objectStoreNames.length; i++) {
+                    var needToDrop = true;
+                    for (var j = 0; j < optionTables.length; j++) {
+                        if (resultDb.objectStoreNames[i] == optionTables[j].name) {
+                            needToDrop = false;
+                            break;
+                        }
+                    }
+                    if (needToDrop) {
+                        idb.db.deleteObjectStore(resultDb.objectStoreNames[i]);
+                    }
+                }
 
-    // get store from transaction
-    var locationsStore = transaction.objectStore('locations');
 
-    // put products data in productsStore
-    locations.forEach(function(location){
-        var db_op_req = locationsStore.add(location);
+                //create new tables
+                for (var i = 0; i < optionTables.length; i++) {
+                    if (!resultDb.objectStoreNames.contains(optionTables[i].name)) {
+                        var objectStore = resultDb.createObjectStore(optionTables[i].name, { keyPath: optionTables[i].keyPath, autoIncrement: optionTables[i].autoIncrement });
+                        console.log(optionTables[i].name + " Created.");
+                        if (optionTables[i].index != null && optionTables[i].index != 'undefined') {
+                            for (var idx = 0; idx < optionTables[i].index.length; idx++) {
+                                objectStore.createIndex(optionTables[i].index[idx].name, optionTables[i].index[idx].name, { unique: optionTables[i].index[idx].unique });
+                            }
+                        }
+                    }
+                }
+            }
+		},
 
-        db_op_req.onsuccess = function(event) {
-            console.log(event.target.result == location.id); // true
+    insert: function (table, data, callback = null) {
+        var db = idb.db;
+
+        var isTableExists = false;
+        for (var i = 0; i < idb.tables.length; i++) {
+            if (idb.tables[i].name == table) {
+                isTableExists = true;
+                break;
+            }
         }
-    });
-    /*
-    locationsStore.count().onsuccess = function(event) {
-        console.log('[Transaction - COUNT] number of products in store', event.target.result);
-    };
 
-    locationsStore.get(1).onsuccess = function(event) {
-        console.log('[Transaction - GET] product with id 1', event.target.result);
-    };
+        if (!isTableExists) {
+            if (callback && typeof (callback) === "function") {
+                callback(false, table + " Table not found.");
+            }
+        }
+        else {
+            var tx = db.transaction(table, "readwrite");
+            var store = tx.objectStore(table);
 
-    locations[0].name = 'Blue Men T-shirt';
-    locationsStore.put(locations[0]).onsuccess = function(event) {
-        console.log('[Transaction - PUT] product with id 1', event.target.result);
-    };
 
-    locationsStore.delete(2).onsuccess = function(event) {
-        console.log('[Transaction - DELETE] deleted with id 2');
-    };
-    */
-};
+            var dataLength = 1;
+            if (data.constructor === Array) {
+                dataLength = data.length;
+                for (var i = 0; i < dataLength; i++) {
+                    store.add(data[i]);
+                }
+            }
+            else {
+                store.add(data);
+            }
 
-request.onerror = function(event) {
-    console.log('[onerror]', request.error);
-	};
+            tx.oncomplete = function () {
+                if (callback && typeof (callback) === "function") {
+                    callback(true, "" + dataLength + " records inserted.");
+                }
+            };
+        }
+    },
+
+    select: function (table, key, callback) {
+            var db = idb.db;
+
+            var isTableExists = false;
+            for (var i = 0; i < idb.tables.length; i++) {
+                if (idb.tables[i].name == table) {
+                    isTableExists = true;
+                    break;
+                }
+            }
+
+            if (!isTableExists) {
+                if (callback && typeof (callback) === "function") {
+                    callback(false, table + " Table not found.");
+                }
+            }
+            else {
+
+                var tx = db.transaction(table, "readonly");
+                var store = tx.objectStore(table);
+                var request;
+                var keyLength = -1;
+                var data;
+                if (key && typeof (key) === "function") {
+                    request = store.getAll();
+                }
+                else if (key.constructor === Array) {
+                    keyLength = key.length
+                    request = store.getAll();
+                }
+                else if (key && typeof key === 'object' && key.constructor === Object) {
+                    keyLength = 1
+                    var index = store.index(key.key);
+                    request = index.getAll(key.value);
+                }
+                else {
+                    keyLength = 1;
+                    request = store.get(key);
+                }
+
+
+                tx.oncomplete = function (event) {
+                    //if all argument available
+                    var result = request.result;
+                    var keypath = request.source.keyPath;
+                    var filteredResult = [];
+
+                    //if need to filter key array
+                    if (keyLength > 1) {
+                        for (var i = 0; i < result.length; i++) {
+                            for (var j = 0; j < keyLength; j++) {
+                                if (result[i][keypath] == key[j]) {
+                                    filteredResult.push(result[i]);
+                                    break;
+                                }
+                            }
+                        }
+                        result = filteredResult;
+                    }
+
+
+                    if (callback && typeof (callback) === "function") {
+                        callback(true, result);
+
+                    }
+
+                    //if only two argument available
+                    if (key && typeof (key) === "function") {
+                        key(true, request.result);
+                    }
+                }
+
+                tx.onerror = function () {
+                    if (callback && typeof (callback) === "function") {
+                        callback(false, request.error);
+                    }
+                };
+            }
+        }, 
+    };
